@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:4.4
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    networks:
+      - iotdevices_network
+    volumes:
+      - mongo-data:/data/db
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:15.0.2
+    container_name: keycloak
+    environment:
+      - KEYCLOAK_USER=admin
+      - KEYCLOAK_PASSWORD=admin
+      - DB_VENDOR=h2
+      - KEYCLOAK_IMPORT=/tmp/keycloak-realm.json
+    ports:
+      - "8085:8080"
+    networks:
+      - iotdevices_network
+    volumes:
+      - ./keycloak-realm.json:/tmp/keycloak-realm.json
+
+  springboot:
+    build: ./
+    container_name: springboot
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/iotdeviceapp
+      - KEYCLOAK_AUTH_SERVER_URL=http://keycloak:8080/auth
+      - KEYCLOAK_REALM=myrealm
+      - KEYCLOAK_RESOURCE=myclient
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://keycloak:8080/auth/realms/myrealm
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/auth/realms/myrealm/protocol/openid-connect/certs
+    networks:
+      - iotdevices_network
+    depends_on:
+      - mongodb
+      - keycloak
+
+networks:
+  iotdevices_network:
+    external: true
+
+volumes:
+  mongo-data:
+  keycloak-data:
